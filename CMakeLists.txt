@@ -9,12 +9,20 @@ option(KNOTWORK_BUILD_TESTS "Build Knotwork tests" ON)
 option(KNOTWORK_BUILD_FUZZER "Build libFuzzer harness" OFF)
 
 add_library(knotwork
+  src/animation.cpp
+  src/bounds.cpp
+  src/builder.cpp
   src/binary_reader.cpp
   src/binary_writer.cpp
+  src/diagnostics.cpp
   src/flatten.cpp
   src/format.cpp
+  src/graph.cpp
+  src/json.cpp
   src/math.cpp
+  src/query.cpp
   src/scene.cpp
+  src/text.cpp
   src/validate.cpp
 )
 
@@ -29,7 +37,10 @@ target_link_libraries(knotwork-seed PRIVATE knotwork)
 
 if(KNOTWORK_BUILD_TESTS)
   enable_testing()
-  add_executable(knotwork-tests tests/test_main.cpp)
+  add_executable(knotwork-tests
+    tests/generated_conformance.cpp
+    tests/test_main.cpp
+  )
   target_link_libraries(knotwork-tests PRIVATE knotwork)
   add_test(NAME knotwork-tests COMMAND knotwork-tests)
 endif()
