@@ -1,0 +1,14 @@
+build/
+fuzz-build/
+fuzz-build-gcc/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.profraw
+*.profdata
+*.log
+.cache/
+.knotwork.git/
+.DS_Store
