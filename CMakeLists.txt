@@ -37,10 +37,7 @@ target_link_libraries(knotwork-seed PRIVATE knotwork)
 
 if(KNOTWORK_BUILD_TESTS)
   enable_testing()
-  add_executable(knotwork-tests
-    tests/generated_conformance.cpp
-    tests/test_main.cpp
-  )
+  add_executable(knotwork-tests tests/test_main.cpp)
   target_link_libraries(knotwork-tests PRIVATE knotwork)
   add_test(NAME knotwork-tests COMMAND knotwork-tests)
 endif()

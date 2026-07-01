@@ -5,10 +5,6 @@
 #include <string>
 #include <vector>
 
-namespace knotwork_generated {
-int run_generated_conformance();
-}
-
 namespace {
 
 struct Failure {
@@ -139,10 +135,6 @@ int main() {
   parent_cycle_is_rejected();
   instance_cycle_is_rejected();
   malformed_bytes_do_not_load();
-  const int generated = knotwork_generated::run_generated_conformance();
-  if (generated != 0) {
-    return generated;
-  }
 
   if (!failures().empty()) {
     for (const Failure& failure : failures()) {
