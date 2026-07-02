@@ -8,6 +8,9 @@ namespace {
 
 constexpr char kMeshMagic[8] = {'K', 'N', 'O', 'T', 'M', 'S', 'H', '\0'};
 constexpr std::uint16_t kMeshVersion = 1;
+constexpr std::uint32_t kMaxMeshNameBytes = 1024 * 1024;
+constexpr std::uint32_t kMaxMeshVertices = 1000000;
+constexpr std::uint32_t kMaxMeshTriangles = 2000000;
 
 struct MeshHeader {
   char magic[8]{};
@@ -76,6 +79,10 @@ std::uint64_t fnv1a(std::uint64_t hash, const void* data, std::size_t size) {
   return hash;
 }
 
+bool count_fits_remaining(std::uint32_t count, std::size_t element_size, std::size_t remaining) {
+  return count <= remaining / element_size;
+}
+
 }  // namespace
 
 std::vector<std::byte> save_mesh_binary(const MeshAsset& mesh) {
@@ -110,10 +117,22 @@ MeshIoResult<MeshAsset> load_mesh_binary(std::span<const std::byte> bytes) {
   if (header.version != kMeshVersion) {
     return error("mesh version is unsupported");
   }
+  if (header.name_size > kMaxMeshNameBytes || header.vertex_count > kMaxMeshVertices ||
+      header.triangle_count > kMaxMeshTriangles) {
+    return error("mesh table count exceeds implementation limit");
+  }
   MeshAsset mesh;
   mesh.material = header.material;
   if (!reader.read_text(mesh.name, header.name_size)) {
     return error("mesh file ended while reading name");
+  }
+  if (!count_fits_remaining(header.vertex_count, sizeof(Vertex), reader.remaining())) {
+    return error("mesh vertex table exceeds remaining input");
+  }
+  const std::size_t bytes_after_vertices =
+      reader.remaining() - static_cast<std::size_t>(header.vertex_count) * sizeof(Vertex);
+  if (!count_fits_remaining(header.triangle_count, sizeof(Triangle), bytes_after_vertices)) {
+    return error("mesh triangle table exceeds remaining input");
   }
   mesh.vertices.resize(header.vertex_count);
   mesh.triangles.resize(header.triangle_count);

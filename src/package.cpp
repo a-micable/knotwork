@@ -9,6 +9,9 @@ namespace {
 
 constexpr char kPackageMagic[8] = {'K', 'N', 'O', 'T', 'P', 'K', 'G', '\0'};
 constexpr std::uint16_t kPackageVersion = 1;
+constexpr std::uint32_t kMaxPackageEntries = 4096;
+constexpr std::uint32_t kMaxPackageNameBytes = 64 * 1024;
+constexpr std::uint32_t kMaxPackagePayloadBytes = 64 * 1024 * 1024;
 
 struct PackageHeader {
   char magic[8]{};
@@ -159,6 +162,10 @@ Result<Package> load_package(std::span<const std::byte> bytes) {
   if (header.version != kPackageVersion) {
     return SceneError{SceneErrorCode::UnsupportedVersion, "package version is unsupported"};
   }
+  if (header.entry_count > kMaxPackageEntries ||
+      header.entry_count > reader.remaining() / sizeof(EntryHeader)) {
+    return SceneError{SceneErrorCode::CountLimitExceeded, "package entry count exceeds implementation limit"};
+  }
   Package package;
   package.entries.reserve(header.entry_count);
   for (std::uint32_t i = 0; i < header.entry_count; ++i) {
@@ -169,6 +176,9 @@ Result<Package> load_package(std::span<const std::byte> bytes) {
     if (item.kind < static_cast<std::uint8_t>(PackageEntryKind::Scene) ||
         item.kind > static_cast<std::uint8_t>(PackageEntryKind::Binary)) {
       return SceneError{SceneErrorCode::InvalidEnum, "package entry kind is invalid"};
+    }
+    if (item.name_size > kMaxPackageNameBytes || item.payload_size > kMaxPackagePayloadBytes) {
+      return SceneError{SceneErrorCode::CountLimitExceeded, "package entry size exceeds implementation limit"};
     }
     PackageEntry entry;
     entry.kind = static_cast<PackageEntryKind>(item.kind);

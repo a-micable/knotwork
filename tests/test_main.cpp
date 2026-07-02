@@ -249,6 +249,21 @@ void package_round_trip_preserves_entries() {
   require(knotwork::find_entry(loaded.value(), "floor.obj").has_value(), test, "missing mesh entry");
 }
 
+void malformed_package_count_is_rejected_before_reserve() {
+  const std::string test = "malformed_package_count_is_rejected_before_reserve";
+  const std::vector<std::byte> bytes{
+      std::byte{'K'},  std::byte{'N'},  std::byte{'O'},  std::byte{'T'},
+      std::byte{'P'},  std::byte{'K'},  std::byte{'G'},  std::byte{0},
+      std::byte{1},    std::byte{0},    std::byte{0},    std::byte{0},
+      std::byte{0xff}, std::byte{0xff}, std::byte{0xff}, std::byte{0xff}};
+  auto loaded = knotwork::load_package(bytes);
+  require(!loaded.ok(), test, "malformed package count loaded successfully");
+  if (!loaded.ok()) {
+    require(loaded.error().code == knotwork::SceneErrorCode::CountLimitExceeded, test,
+            "malformed package count produced wrong error");
+  }
+}
+
 void inspection_reports_scene_and_assets() {
   const std::string test = "inspection_reports_scene_and_assets";
   knotwork::AssetLibrary assets;
@@ -272,6 +287,20 @@ void mesh_binary_round_trip_preserves_hash() {
     return;
   }
   require(knotwork::mesh_content_hash(loaded.value()) == before, test, "mesh hash changed");
+}
+
+void malformed_mesh_counts_are_rejected_before_allocation() {
+  const std::string test = "malformed_mesh_counts_are_rejected_before_allocation";
+  const std::vector<std::byte> bytes{
+      std::byte{'K'},  std::byte{'N'},  std::byte{'O'},  std::byte{'T'},
+      std::byte{'M'},  std::byte{'S'},  std::byte{'H'},  std::byte{0},
+      std::byte{1},    std::byte{0},    std::byte{0},    std::byte{0},
+      std::byte{0},    std::byte{0},    std::byte{0},    std::byte{0},
+      std::byte{0xff}, std::byte{0xff}, std::byte{0xff}, std::byte{0xff},
+      std::byte{0xff}, std::byte{0xff}, std::byte{0xff}, std::byte{0xff},
+      std::byte{0xff}, std::byte{0xff}, std::byte{0xff}, std::byte{0xff}};
+  auto loaded = knotwork::load_mesh_binary(bytes);
+  require(!loaded.ok(), test, "malformed mesh count loaded successfully");
 }
 
 void bvh_raycast_matches_direct_mesh_raycast() {
@@ -596,8 +625,10 @@ int main() {
   raycast_hits_mesh_in_scene();
   patches_and_diffs_apply_scene_changes();
   package_round_trip_preserves_entries();
+  malformed_package_count_is_rejected_before_reserve();
   inspection_reports_scene_and_assets();
   mesh_binary_round_trip_preserves_hash();
+  malformed_mesh_counts_are_rejected_before_allocation();
   bvh_raycast_matches_direct_mesh_raycast();
   optimizer_removes_unused_scene_data();
   command_history_undoes_transform();
