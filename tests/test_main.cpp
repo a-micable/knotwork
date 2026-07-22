@@ -136,6 +136,24 @@ void parent_cycle_is_rejected() {
   }
 }
 
+void deep_parent_chain_is_rejected_without_stack_growth() {
+  const std::string test = "deep_parent_chain_is_rejected_without_stack_growth";
+  knotwork::Scene scene;
+  scene.strings = {"node"};
+  constexpr std::uint32_t count = 5000;
+  scene.nodes.reserve(count);
+  for (std::uint32_t i = 0; i < count; ++i) {
+    scene.nodes.push_back(make_node(i + 1, 0, knotwork::NodeKind::Empty));
+    scene.nodes.back().parent = i + 1 < count ? i + 1 : knotwork::kNoIndex;
+  }
+  auto loaded = knotwork::load_scene(knotwork::save_scene(scene));
+  require(!loaded.ok(), test, "deep parent chain loaded successfully");
+  if (!loaded.ok()) {
+    require(loaded.error().code == knotwork::SceneErrorCode::CountLimitExceeded, test,
+            "deep parent chain produced wrong error");
+  }
+}
+
 void instance_cycle_is_rejected() {
   const std::string test = "instance_cycle_is_rejected";
   knotwork::Scene scene;
@@ -617,6 +635,7 @@ int main() {
   flatten_composes_parent_transform();
   flatten_applies_instance_target();
   parent_cycle_is_rejected();
+  deep_parent_chain_is_rejected_without_stack_growth();
   instance_cycle_is_rejected();
   malformed_bytes_do_not_load();
   mesh_primitives_have_expected_stats();

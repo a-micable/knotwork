@@ -1,11 +1,14 @@
 #include "knotwork/validate.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <unordered_set>
 #include <vector>
 
 namespace knotwork {
 namespace {
+
+constexpr std::uint32_t kMaxSceneGraphDepth = 4096;
 
 SceneError ok() {
   return {};
@@ -39,30 +42,28 @@ bool valid_material_ref(const Scene& scene, std::uint32_t index) {
 SceneError detect_parent_cycles(const Scene& scene) {
   enum class Mark : std::uint8_t { Unvisited, Visiting, Done };
   std::vector<Mark> marks(scene.nodes.size(), Mark::Unvisited);
+  std::vector<std::uint32_t> stack;
+  stack.reserve(std::min<std::size_t>(scene.nodes.size(), kMaxSceneGraphDepth));
 
-  auto visit = [&](auto&& self, std::uint32_t index) -> SceneError {
-    if (marks[index] == Mark::Visiting) {
-      return error(SceneErrorCode::Cycle, "parent hierarchy contains a cycle");
+  for (std::uint32_t start = 0; start < scene.nodes.size(); ++start) {
+    if (marks[start] == Mark::Done) {
+      continue;
     }
-    if (marks[index] == Mark::Done) {
-      return ok();
-    }
-    marks[index] = Mark::Visiting;
-    const std::uint32_t parent = scene.nodes[index].parent;
-    if (parent != kNoIndex) {
-      const SceneError nested = self(self, parent);
-      if (nested.code != SceneErrorCode::None) {
-        return nested;
+    std::uint32_t current = start;
+    stack.clear();
+    while (current != kNoIndex && marks[current] != Mark::Done) {
+      if (marks[current] == Mark::Visiting) {
+        return error(SceneErrorCode::Cycle, "parent hierarchy contains a cycle");
       }
+      if (stack.size() >= kMaxSceneGraphDepth) {
+        return error(SceneErrorCode::CountLimitExceeded, "parent hierarchy exceeds maximum depth");
+      }
+      marks[current] = Mark::Visiting;
+      stack.push_back(current);
+      current = scene.nodes[current].parent;
     }
-    marks[index] = Mark::Done;
-    return ok();
-  };
-
-  for (std::uint32_t i = 0; i < scene.nodes.size(); ++i) {
-    const SceneError result = visit(visit, i);
-    if (result.code != SceneErrorCode::None) {
-      return result;
+    for (std::uint32_t node : stack) {
+      marks[node] = Mark::Done;
     }
   }
   return ok();
@@ -71,30 +72,29 @@ SceneError detect_parent_cycles(const Scene& scene) {
 SceneError detect_instance_cycles(const Scene& scene) {
   enum class Mark : std::uint8_t { Unvisited, Visiting, Done };
   std::vector<Mark> marks(scene.nodes.size(), Mark::Unvisited);
+  std::vector<std::uint32_t> stack;
+  stack.reserve(std::min<std::size_t>(scene.nodes.size(), kMaxSceneGraphDepth));
 
-  auto visit = [&](auto&& self, std::uint32_t index) -> SceneError {
-    if (marks[index] == Mark::Visiting) {
-      return error(SceneErrorCode::Cycle, "instance references contain a cycle");
+  for (std::uint32_t start = 0; start < scene.nodes.size(); ++start) {
+    if (marks[start] == Mark::Done) {
+      continue;
     }
-    if (marks[index] == Mark::Done) {
-      return ok();
-    }
-    marks[index] = Mark::Visiting;
-    const Node& node = scene.nodes[index];
-    if (node.kind == NodeKind::Instance && node.instance_target != kNoIndex) {
-      const SceneError nested = self(self, node.instance_target);
-      if (nested.code != SceneErrorCode::None) {
-        return nested;
+    std::uint32_t current = start;
+    stack.clear();
+    while (current != kNoIndex && marks[current] != Mark::Done) {
+      if (marks[current] == Mark::Visiting) {
+        return error(SceneErrorCode::Cycle, "instance references contain a cycle");
       }
+      if (stack.size() >= kMaxSceneGraphDepth) {
+        return error(SceneErrorCode::CountLimitExceeded, "instance reference chain exceeds maximum depth");
+      }
+      marks[current] = Mark::Visiting;
+      stack.push_back(current);
+      const Node& node = scene.nodes[current];
+      current = node.kind == NodeKind::Instance ? node.instance_target : kNoIndex;
     }
-    marks[index] = Mark::Done;
-    return ok();
-  };
-
-  for (std::uint32_t i = 0; i < scene.nodes.size(); ++i) {
-    const SceneError result = visit(visit, i);
-    if (result.code != SceneErrorCode::None) {
-      return result;
+    for (std::uint32_t node : stack) {
+      marks[node] = Mark::Done;
     }
   }
   return ok();
